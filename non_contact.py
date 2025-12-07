@@ -128,18 +128,23 @@ while True:
             print("Slope (raw):", slope, " | Filtered (scheme1):", slope_filtered)
 
             # print("Slope:", slope)
+            if abs(vx) < 1e-6:
+                # Draw vertical line
+                X = int(x + x0)  # x0 是 ROI 内坐标
+                pt1 = (X, y)
+                pt2 = (X, y + roi_frame.shape[0] - 1)
+            else:
+                # Calculate points to draw the line (relative to ROI)
+                cols = roi_frame.shape[1]
+                lefty  = int((-x0 * vy / vx) + y0)
+                righty = int(((cols - x0) * vy / vx) + y0)
 
-            # Calculate points to draw the line (relative to ROI)
-            cols = roi_frame.shape[1]
-            lefty  = int((-x0 * vy / vx) + y0)
-            righty = int(((cols - x0) * vy / vx) + y0)
-
-            # lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
-            # righty = np.clip(righty, 0, roi_frame.shape[0]-1)
+                lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
+                righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
-            # Adjust to full frame coordinates
-            pt1 = (x + 0, y + lefty)
-            pt2 = (x + cols - 1, y + righty)
+                # Adjust to full frame coordinates
+                pt1 = (x + 0, y + lefty)
+                pt2 = (x + cols - 1, y + righty)
 
             # Draw line
             cv2.line(result, pt1, pt2, (0, 255, 0), 2)
