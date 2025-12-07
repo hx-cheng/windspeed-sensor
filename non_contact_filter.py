@@ -42,7 +42,7 @@ else:
     x, y, w, h = 0, 0, W, H
 
 # ====== FILTER INITIALISATION ======
-slope_cap = 20          # Low-pass 上限（绝对值）
+slope_cap = 15          # Low-pass 上限（绝对值）
 
 # ---------------------------------------------------------
 # 3. 主循环：实时处理
