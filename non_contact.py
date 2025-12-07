@@ -102,8 +102,8 @@ while True:
                 righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
                 # Adjust to full frame coordinates
-                pt1 = (x + 0,        y + lefty)
-                pt2 = (x + cols - 1, y + righty)
+                pt1 = (int(x + 0), int(y + lefty))
+                pt2 = (int(x + cols - 1), int(y + righty))
 
                 # Draw line
                 cv2.line(result, pt1, pt2, (0, 255, 0), 2)
