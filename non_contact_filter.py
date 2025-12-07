@@ -105,17 +105,9 @@ while True:
             else:
                 slope_clean = slope
 
-            # 2. EMA 平滑逻辑
-            #    情况 1：第一次运行（没有历史值），直接等于当前 slope_clean
-            #    情况 2：当前已经被限幅（== slope_cap 或 == -slope_cap），直接用 slope_clean
-            #    情况 3：正常范围 → 用 EMA 平滑
-            if slope_filtered is None or slope_clean == slope_cap or slope_clean == -slope_cap:
-                slope_filtered = slope_clean
-            else:
-                slope_filtered = alpha * slope_clean + (1 - alpha) * slope_filtered
 
             # 3. Debug 输出
-            print(f"Slope (raw): {slope:.5f} | Filtered: {slope_filtered:.5f}")
+            print(f"Slope (raw): {slope:.5f} | Filtered: {slope_clean:.5f}")
 
             # print("Slope:", slope)
             if abs(vx) < 1e-6:
