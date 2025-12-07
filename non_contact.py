@@ -139,8 +139,8 @@ while True:
                 lefty  = int((-x0 * vy / vx) + y0)
                 righty = int(((cols - x0) * vy / vx) + y0)
 
-                lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
-                righty = np.clip(righty, 0, roi_frame.shape[0]-1)
+                # lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
+                # righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
                 # Adjust to full frame coordinates
                 pt1 = (x + 0, y + lefty)
