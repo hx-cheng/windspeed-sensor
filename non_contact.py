@@ -33,8 +33,8 @@ if os.path.exists(CONFIG_FILE):
 else:
     print("config.json not found! Using defaults.")
 
-    lower = np.array([21, 78, 152], dtype=np.uint8)
-    upper = np.array([41, 255, 255], dtype=np.uint8)
+    lower = np.array([60, 50, 50], dtype=np.uint8)
+    upper = np.array([85, 255, 255], dtype=np.uint8)
 
     # 先读取一帧确认尺寸
     tmp = picam2.capture_array()
@@ -48,7 +48,7 @@ else:
 while True:
     # 拍摄一帧
     frame = picam2.capture_array()     # RGB888
-    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    frame_bgr = frame #cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
     # Crop to ROI ROI 裁剪
     roi_frame = frame_bgr[y:y+h, x:x+w]
@@ -97,6 +97,9 @@ while True:
             if abs(vx) > 1e-6:
                 lefty  = int((-x0 * vy / vx) + y0)
                 righty = int(((cols - x0) * vy / vx) + y0)
+
+                lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
+                righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
                 # Adjust to full frame coordinates
                 pt1 = (x + 0,        y + lefty)
@@ -111,7 +114,8 @@ while True:
 
     # Display side-by-side
     show = np.hstack((frame_bgr, result))
-    cv2.imshow("Original | Line Fitted (Picamera2)", show)
+    cv2.imshow("Frame | Line Fitted (Picamera2)", show)
+    
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
