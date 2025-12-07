@@ -42,10 +42,9 @@ else:
     x, y, w, h = 0, 0, W, H
 
 # ====== FILTER INITIALISATION ======
-slope_history = []     # 用于 median filter（窗口最多 3）
-slope_filtered = None  # EMA 的状态量
-alpha = 0.2            # EMA 系数，可调
-outlier_threshold = 0.5  # slope 跳变阈值，可按实际调节
+slope_filtered = None   # EMA 的状态
+alpha = 0.2             # EMA 系数，可以之后再调
+slope_cap = 30          # Low-pass 上限（绝对值）
 
 # ---------------------------------------------------------
 # 3. 主循环：实时处理
@@ -96,36 +95,27 @@ while True:
             else:
                 slope = vy / vx
 
-            # ====== SCHEME 1: Adaptive Median + EMA ======
+            # ===== LOW-PASS + EMA FILTERING =====
 
-            # 初始化历史 slope（用于 outlier 检测）
-            if slope_history:
-                slope_prev = slope_history[-1]
+            # 1. Low-pass 硬限幅（包括 slope == inf 的情况）
+            if slope == float("inf") or slope > slope_cap:
+                slope_clean = slope_cap
+            elif slope < -slope_cap:
+                slope_clean = -slope_cap
             else:
-                slope_prev = slope
+                slope_clean = slope
 
-            # 判断是否是 outlier（可根据实际情况调节 outlier_threshold）
-            if abs(slope - slope_prev) > outlier_threshold:
-                # 使用 adaptive median（只对 outlier 修正）
-                slope_history.append(slope)
-                if len(slope_history) > 3:
-                    slope_history.pop(0)
-                slope_med = float(np.median(slope_history))
+            # 2. EMA 平滑逻辑
+            #    情况 1：第一次运行（没有历史值），直接等于当前 slope_clean
+            #    情况 2：当前已经被限幅（== slope_cap 或 == -slope_cap），直接用 slope_clean
+            #    情况 3：正常范围 → 用 EMA 平滑
+            if slope_filtered is None or slope_clean == slope_cap or slope_clean == -slope_cap:
+                slope_filtered = slope_clean
             else:
-                # 非 outlier 直接使用原 slope
-                slope_history.append(slope)
-                if len(slope_history) > 3:
-                    slope_history.pop(0)
-                slope_med = slope
+                slope_filtered = alpha * slope_clean + (1 - alpha) * slope_filtered
 
-            # EMA 滤波
-            if slope_filtered is None:
-                slope_filtered = slope_med
-            else:
-                slope_filtered = alpha * slope_med + (1 - alpha) * slope_filtered
-
-            # 使用 slope_filtered 作为最终输出
-            print("Slope (raw):", slope, " | Filtered (scheme1):", slope_filtered)
+            # 3. Debug 输出
+            print(f"Slope (raw): {slope:.5f} | Filtered: {slope_filtered:.5f}")
 
             # print("Slope:", slope)
             if abs(vx) < 1e-6:
