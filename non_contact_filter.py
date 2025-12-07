@@ -42,9 +42,7 @@ else:
     x, y, w, h = 0, 0, W, H
 
 # ====== FILTER INITIALISATION ======
-slope_filtered = None   # EMA 的状态
-alpha = 0.2             # EMA 系数，可以之后再调
-slope_cap = 30          # Low-pass 上限（绝对值）
+slope_cap = 20          # Low-pass 上限（绝对值）
 
 # ---------------------------------------------------------
 # 3. 主循环：实时处理
