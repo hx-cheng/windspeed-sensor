@@ -131,19 +131,18 @@ while True:
 
             # Calculate points to draw the line (relative to ROI)
             cols = roi_frame.shape[1]
-            if abs(vx) > 1e-6:
-                lefty  = int((-x0 * vy / vx) + y0)
-                righty = int(((cols - x0) * vy / vx) + y0)
+            lefty  = int((-x0 * vy / vx) + y0)
+            righty = int(((cols - x0) * vy / vx) + y0)
 
-                lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
-                righty = np.clip(righty, 0, roi_frame.shape[0]-1)
+            # lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
+            # righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
-                # Adjust to full frame coordinates
-                pt1 = (int(x + 0), int(y + lefty))
-                pt2 = (int(x + cols - 1), int(y + righty))
+            # Adjust to full frame coordinates
+            pt1 = (x + 0, y + lefty)
+            pt2 = (x + cols - 1, y + righty)
 
-                # Draw line
-                cv2.line(result, pt1, pt2, (0, 255, 0), 2)
+            # Draw line
+            cv2.line(result, pt1, pt2, (0, 255, 0), 2)
 
             # Draw contour for reference (adjust offset)
             c_shifted = c + np.array([x, y])
@@ -154,7 +153,7 @@ while True:
     cv2.imshow("Frame | Line Fitted (Picamera2)", show)
     
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(30) & 0xFF == ord('q'):
         break
 
 cv2.destroyAllWindows()
