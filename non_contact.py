@@ -41,6 +41,12 @@ else:
     H, W = tmp.shape[:2]
     x, y, w, h = 0, 0, W, H
 
+# ====== FILTER INITIALISATION ======
+slope_history = []     # 用于 median filter（窗口最多 3）
+slope_filtered = None  # EMA 的状态量
+alpha = 0.2            # EMA 系数，可调
+outlier_threshold = 0.5  # slope 跳变阈值，可按实际调节
+
 # ---------------------------------------------------------
 # 3. 主循环：实时处理
 # ---------------------------------------------------------
@@ -90,7 +96,38 @@ while True:
             else:
                 slope = vy / vx
 
-            print("Slope:", slope)
+            # ====== SCHEME 1: Adaptive Median + EMA ======
+
+            # 初始化历史 slope（用于 outlier 检测）
+            if slope_history:
+                slope_prev = slope_history[-1]
+            else:
+                slope_prev = slope
+
+            # 判断是否是 outlier（可根据实际情况调节 outlier_threshold）
+            if abs(slope - slope_prev) > outlier_threshold:
+                # 使用 adaptive median（只对 outlier 修正）
+                slope_history.append(slope)
+                if len(slope_history) > 3:
+                    slope_history.pop(0)
+                slope_med = float(np.median(slope_history))
+            else:
+                # 非 outlier 直接使用原 slope
+                slope_history.append(slope)
+                if len(slope_history) > 3:
+                    slope_history.pop(0)
+                slope_med = slope
+
+            # EMA 滤波
+            if slope_filtered is None:
+                slope_filtered = slope_med
+            else:
+                slope_filtered = alpha * slope_med + (1 - alpha) * slope_filtered
+
+            # 使用 slope_filtered 作为最终输出
+            print("Slope (raw):", slope, " | Filtered (scheme1):", slope_filtered)
+
+            # print("Slope:", slope)
 
             # Calculate points to draw the line (relative to ROI)
             cols = roi_frame.shape[1]
