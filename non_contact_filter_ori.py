@@ -5,21 +5,6 @@ import numpy as np
 import json
 import os
 
-import serial
-
-# ---------------------------------------------------------
-# 0. UART 配置
-# ---------------------------------------------------------
-# Configure UART
-ser = serial.Serial(
-    port="/dev/ttyAMA0",
-    baudrate=115200,
-    timeout=1,
-    write_timeout=2
-)
-
-print("UART opened on /dev/ttyAMA0")
-
 # ---------------------------------------------------------
 # 1. Open Pi Camera（Picamera2）
 # ---------------------------------------------------------
@@ -122,23 +107,7 @@ while True:
             # 3. Debug 输出
             print(f"Slope (raw): {slope:.5f} | Filtered: {slope_clean:.5f}")
 
-            # ===== 通过 UART 发送数据 =====
-            try:
-
-                msg = f"{slope_clean:.5f}\r\n"
-
-                ser.write(msg.encode("utf-8"))
-                ser.flush()
-                
-                print(f"UART Sent: {msg.strip()}")
-
-            except KeyboardInterrupt:
-                print("\nStopped by user.")
-
-            except serial.SerialTimeoutException:
-                print("⚠️ Serial write timeout — the UART buffer may be full.")
-
-
+            # print("Slope:", slope)
             if abs(vx) < 1e-6:
                 # Draw vertical line
                 X = int(x + x0)  # x0 是 ROI 内坐标
@@ -149,6 +118,9 @@ while True:
                 cols = roi_frame.shape[1]
                 lefty  = int((-x0 * vy / vx) + y0)
                 righty = int(((cols - x0) * vy / vx) + y0)
+
+                #lefty  = np.clip(lefty, 0, roi_frame.shape[0]-1)
+                #righty = np.clip(righty, 0, roi_frame.shape[0]-1)
                 
                 # Adjust to full frame coordinates
                 pt1 = (x + 0, y + lefty)
@@ -171,6 +143,3 @@ while True:
 
 cv2.destroyAllWindows()
 picam2.stop()
-
-ser.close()
-print("UART closed.")
