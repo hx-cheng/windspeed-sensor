@@ -6,23 +6,25 @@ import json
 import os
 
 import serial
+import threading
+from threading import Event, Lock
 
-# ---------------------------------------------------------
-# 0. UART 配置
-# ---------------------------------------------------------
-# Configure UART
+slope_cap = 15          # Low-pass Upper bound
+
+shared_slope_clean = 0.0
+slope_lock = Lock()
+stop_event = Event()
+
+# 0. Configure UART
 ser = serial.Serial(
     port="/dev/ttyAMA0",
     baudrate=115200,
     timeout=1,
     write_timeout=2
 )
+print("Sending over UART. Press Ctrl+C to stop.\n")
 
-print("UART opened on /dev/ttyAMA0")
-
-# ---------------------------------------------------------
 # 1. Open Pi Camera（Picamera2）
-# ---------------------------------------------------------
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(main={"format": "RGB888", "size": (1280, 720)})
 picam2.configure(config)
@@ -31,9 +33,7 @@ time.sleep(0.3)   # short warm-up for AE/AWB
 
 print("Camera started. Press 'q' to quit.")
 
-# ---------------------------------------------------------
-# 2. Laod config 加载配置文件（HSV + ROI）
-# ---------------------------------------------------------
+# 2. Laod config（HSV + ROI）
 CONFIG_FILE = 'config.json'
 if os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE, 'r') as f:
@@ -51,39 +51,61 @@ else:
     lower = np.array([60, 50, 50], dtype=np.uint8)
     upper = np.array([85, 255, 255], dtype=np.uint8)
 
-    # 先读取一帧确认尺寸
     tmp = picam2.capture_array()
     H, W = tmp.shape[:2]
     x, y, w, h = 0, 0, W, H
 
-# ====== FILTER INITIALISATION ======
-slope_cap = 15          # Low-pass 上限（绝对值）
+def uart_thread():
+    global shared_slope_clean
 
-# ---------------------------------------------------------
-# 3. 主循环：实时处理
-# ---------------------------------------------------------
+    target_hz = 200.0
+    dt = 1.0 / target_hz
+    next_t = time.perf_counter()
 
+    while not stop_event.is_set():
+
+        # Read latest slope_clean
+        with slope_lock:
+            slope_to_send = shared_slope_clean
+
+        msg = f"{slope_to_send:.5f}\r\n"
+        ser.write(msg.encode("utf-8"))
+
+        # 200 Hz timer
+        next_t += dt
+        sleep_time = next_t - time.perf_counter()
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+        else:
+            next_t = time.perf_counter()
+
+    print("UART thread stopped.")
+
+# Start uart thread
+t_uart = threading.Thread(target=uart_thread, daemon=True)
+t_uart.start()
+
+# 3. main loop
 while True:
-    # 拍摄一帧
     frame = picam2.capture_array()     # RGB888
-    frame_bgr = frame #cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    frame_bgr = frame
 
-    # Crop to ROI ROI 裁剪
+    # Crop to ROI
     roi_frame = frame_bgr[y:y+h, x:x+w]
     if roi_frame.size == 0:
         print("ROI invalid. Please check config.json.")
         break
 
-    # Convert to HSV and create mask HSV 分割
+    # Convert to HSV and create mask
     hsv = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower, upper)
 
-    # Clean up mask去噪
+    # Clean up mask
     kernel = np.ones((3,3), np.uint8)
     mask = cv2.erode(mask, kernel, iterations=1)
     mask = cv2.dilate(mask, kernel, iterations=2)
 
-    # # Find contours 查找轮廓
+    # Find contours 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Create a copy for drawing
@@ -102,15 +124,13 @@ while True:
             vx, vy = float(vx), float(vy)
             x0, y0 = float(x0), float(y0)
 
-            # === 计算斜率 ===
+            # Slpoe calculation
             if abs(vx) < 1e-6:
-                slope = float('inf')     # 垂直线
+                slope = float('inf')     # Vertical
             else:
                 slope = vy / vx
 
-            # ===== LOW-PASS + EMA FILTERING =====
-
-            # 1. Low-pass 硬限幅（包括 slope == inf 的情况）
+            # Low-pass filtering
             if slope == float("inf") or slope > slope_cap:
                 slope_clean = slope_cap
             elif slope < -slope_cap:
@@ -118,26 +138,9 @@ while True:
             else:
                 slope_clean = slope
 
-
-            # 3. Debug 输出
-            print(f"Slope (raw): {slope:.5f} | Filtered: {slope_clean:.5f}")
-
-            # ===== 通过 UART 发送数据 =====
-            try:
-
-                msg = f"{slope_clean:.5f}\r\n"
-
-                ser.write(msg.encode("utf-8"))
-                ser.flush()
-                
-                print(f"UART Sent: {msg.strip()}")
-
-            except KeyboardInterrupt:
-                print("\nStopped by user.")
-
-            except serial.SerialTimeoutException:
-                print("⚠️ Serial write timeout — the UART buffer may be full.")
-
+            # Output filtered slope data through UART
+            with slope_lock:
+                shared_slope_clean = slope_clean
 
             if abs(vx) < 1e-6:
                 # Draw vertical line
@@ -165,12 +168,16 @@ while True:
     show = np.hstack((frame_bgr, result))
     cv2.imshow("Frame | Line Fitted (Picamera2)", show)
     
-
-    if cv2.waitKey(30) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        stop_event.set()
         break
 
 cv2.destroyAllWindows()
 picam2.stop()
+
+stop_event.set()
+time.sleep(0.1)
+t_uart.join(timeout=0.1)
 
 ser.close()
 print("UART closed.")
