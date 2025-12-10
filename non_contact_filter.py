@@ -67,9 +67,11 @@ def uart_thread():
         # Read latest slope_clean
         with slope_lock:
             slope_to_send = shared_slope_clean
-
+        
         msg = f"{slope_to_send:.5f}\r\n"
         ser.write(msg.encode("utf-8"))
+        ser.flush()
+        print("Sent:", msg.strip())
 
         # 200 Hz timer
         next_t += dt
@@ -137,6 +139,14 @@ while True:
                 slope_clean = -slope_cap
             else:
                 slope_clean = slope
+
+            slope_clean = (
+                0.028 * (slope_clean ** 4)
+                - 0.51 * (slope_clean ** 3)
+                + 3.36 * (slope_clean ** 2)
+                - 10.04 * slope_clean
+                + 15.80
+            )
 
             # Output filtered slope data through UART
             with slope_lock:
