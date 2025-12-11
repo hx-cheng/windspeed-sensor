@@ -140,16 +140,24 @@ while True:
             else:
                 slope_clean = slope
 
+            # slope_clean = (
+            #     0.028 * (slope_clean ** 4)
+            #     - 0.51 * (slope_clean ** 3)
+            #     + 3.36 * (slope_clean ** 2)
+            #     - 10.04 * slope_clean
+            #     + 15.80
+            # )
+
             slope_clean = (
-                0.028 * (slope_clean ** 4)
-                - 0.51 * (slope_clean ** 3)
-                + 3.36 * (slope_clean ** 2)
-                - 10.04 * slope_clean
-                + 15.80
+                -0.053 * (slope_clean ** 4)
+                + 0.745 * (slope_clean ** 3)
+                - 3.447 * (slope_clean ** 2)
+                + 5.651 * slope_clean
+                + 5.758
             )
 
             if slope_clean == float("inf") or slope_clean > 10:
-                slope_clean = 10
+                slope_clean = 0
 
             # Output filtered slope data through UART
             with slope_lock:
