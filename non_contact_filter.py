@@ -9,79 +9,11 @@ import serial
 import threading
 from threading import Event, Lock
 
-import numpy as np
-from collections import deque
-
-class WindSpeedFilter:
-    def __init__(self,
-                 alpha=0.15,          # EMA 系数：越小越平滑
-                 window_size=5,       # median filter 窗口
-                 outlier_abs=1.0,     # 绝对跳变阈值 (m/s)
-                 outlier_rel=0.4):    # 相对跳变阈值（40%）
-        self.alpha = alpha
-        self.window_size = window_size
-        self.outlier_abs = outlier_abs
-        self.outlier_rel = outlier_rel
-
-        self.history = deque(maxlen=window_size)  # 原始 wind speed 历史
-        self.filtered = None                      # EMA 状态
-
-    def update(self, v_meas):
-        """
-        v_meas: 当前帧测到的 wind speed (m/s)，可以为 0 或噪声。
-        返回：滤波后的 wind speed
-        """
-
-        # 1) 处理明显错误值（<=0 当成缺失值）
-        if (v_meas is None) or (v_meas <= 0):
-            # detection fail 的时候，用上一帧 filtered 值“顶住”
-            if self.filtered is not None:
-                return self.filtered
-            else:
-                # 如果一开始就坏点，只能先用 0 或者原值
-                v_meas = 0.0
-
-        # 2) 取上一帧历史
-        if self.history:
-            v_prev_raw = self.history[-1]
-        else:
-            v_prev_raw = v_meas
-
-        # 3) outlier 检测：同时看绝对差和相对差
-        diff_abs = abs(v_meas - v_prev_raw)
-        diff_rel = diff_abs / max(v_prev_raw, 1e-6)
-
-        is_outlier = (diff_abs > self.outlier_abs) and (diff_rel > self.outlier_rel)
-
-        # 4) 更新 history，并做 median 处理
-        self.history.append(v_meas)
-
-        if is_outlier and len(self.history) >= 3:
-            # outlier 时，用当前窗口的 median 修正
-            v_med = float(np.median(list(self.history)))
-        else:
-            # 正常点直接用当前值（也可以用 median，更平滑）
-            v_med = v_meas
-
-        # 5) EMA
-        if self.filtered is None:
-            self.filtered = v_med
-        else:
-            #self.filtered = self.alpha * v_med + (1.0 - self.alpha) * self.filtered
-            self.filtered = v_med
-
-        return self.filtered
-
 slope_cap = 15          # Low-pass Upper bound
 
 shared_slope_clean = 0.0
 slope_lock = Lock()
 stop_event = Event()
-
-wind_filter = WindSpeedFilter(alpha=0.15,
-                              window_size=5,
-                              outlier_abs=1.0,
-                              outlier_rel=0.4)
 
 # 0. Configure UART
 ser = serial.Serial(
@@ -208,24 +140,14 @@ while True:
             else:
                 slope_clean = slope
 
-            # slope_clean = (
-            #     0.028 * (slope_clean ** 4)
-            #     - 0.51 * (slope_clean ** 3)
-            #     + 3.36 * (slope_clean ** 2)
-            #     - 10.04 * slope_clean
-            #     + 15.80
-            # )
-
             slope_clean = (
-                -0.053 * (slope_clean ** 4)
-                + 0.745 * (slope_clean ** 3)
-                - 3.447 * (slope_clean ** 2)
-                + 5.651 * slope_clean
-                + 5.758
+                0.028 * (slope_clean ** 4)
+                - 0.51 * (slope_clean ** 3)
+                + 3.36 * (slope_clean ** 2)
+                - 10.04 * slope_clean
+                + 16.80
             )
-
-            wind_speed_filtered = wind_filter.update(slope_clean)
-                              
+                     
             if slope_clean == float("inf") or slope_clean > 10:
                 slope_clean = 0
 
@@ -235,7 +157,7 @@ while True:
 
             if abs(vx) < 1e-6:
                 # Draw vertical line
-                X = int(x + x0)  # x0 是 ROI 内坐标
+                X = int(x + x0)  
                 pt1 = (X, y)
                 pt2 = (X, y + roi_frame.shape[0] - 1)
             else:
