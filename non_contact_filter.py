@@ -67,7 +67,8 @@ class WindSpeedFilter:
         if self.filtered is None:
             self.filtered = v_med
         else:
-            self.filtered = self.alpha * v_med + (1.0 - self.alpha) * self.filtered
+            #self.filtered = self.alpha * v_med + (1.0 - self.alpha) * self.filtered
+            self.filtered = v_med
 
         return self.filtered
 
