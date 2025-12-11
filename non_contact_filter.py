@@ -148,6 +148,9 @@ while True:
                 + 15.80
             )
 
+            if slope_clean == float("inf") or slope_clean > 10:
+                slope_clean = 10
+
             # Output filtered slope data through UART
             with slope_lock:
                 shared_slope_clean = slope_clean
